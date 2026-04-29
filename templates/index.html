@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entri Bulk Sharing Links</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Entri Bulk Sharing Links</h1>
+      <p class="subtitle">
+        Upload a CSV of domains and get back an XLSX with one Entri sharing link per domain.
+      </p>
+    </header>
+
+    <form id="upload-form" autocomplete="off">
+
+      <!-- ====================================================== -->
+      <!-- Step 1: Credentials                                    -->
+      <!-- ====================================================== -->
+      <section class="card">
+        <h2><span class="step">1</span> Entri credentials</h2>
+        <p class="help-text">
+          Find these in your <a href="https://dashboard.goentri.com" target="_blank" rel="noopener">Entri Dashboard</a>
+          under Application Settings. They're sent securely to this server only — nothing is stored or logged.
+        </p>
+
+        <label for="application_id">Application ID</label>
+        <input
+          type="text"
+          id="application_id"
+          name="application_id"
+          value="{{ prefill_app_id }}"
+          placeholder="e.g. abc123def456"
+          required
+          spellcheck="false"
+          autocapitalize="off"
+        />
+
+        <label for="secret">Secret</label>
+        <div class="secret-wrapper">
+          <input
+            type="password"
+            id="secret"
+            name="secret"
+            placeholder="Your Entri application secret"
+            required
+            spellcheck="false"
+            autocapitalize="off"
+          />
+          <button type="button" id="toggle-secret" class="link-btn" aria-label="Show or hide secret">Show</button>
+        </div>
+      </section>
+
+      <!-- ====================================================== -->
+      <!-- Step 2: Flow & config                                  -->
+      <!-- ====================================================== -->
+      <section class="card">
+        <h2><span class="step">2</span> Sharing config</h2>
+        <p class="help-text">
+          The JSON config object sent to Entri for every domain.
+          The <code>prefilledDomain</code> field is overwritten automatically with each row from your CSV — leave any value there.
+          See the <a href="https://developers.entri.com/api-reference#entrishowentriconfig" target="_blank" rel="noopener">full reference of available fields</a>.
+        </p>
+
+        <label for="flow">Sharing flow</label>
+        <select id="flow" name="flow">
+          <option value="connect" {% if default_flow == 'connect' %}selected{% endif %}>Connect (DNS setup)</option>
+          <option value="sell" {% if default_flow == 'sell' %}selected{% endif %}>Sell (domain purchase)</option>
+        </select>
+
+        <label for="config">Config JSON</label>
+        <textarea
+          id="config"
+          name="config"
+          rows="14"
+          spellcheck="false"
+          required
+        >{{ default_config }}</textarea>
+
+        <div class="row-actions">
+          <button type="button" id="format-json" class="link-btn">Format JSON</button>
+          <button type="button" id="reset-config" class="link-btn">Reset to default</button>
+          <span id="json-status" class="json-status"></span>
+        </div>
+      </section>
+
+      <!-- ====================================================== -->
+      <!-- Step 3: CSV upload                                     -->
+      <!-- ====================================================== -->
+      <section class="card">
+        <h2><span class="step">3</span> Domains CSV</h2>
+        <p class="help-text">
+          One domain per row. A header row named <code>domain</code> is optional. Bare URLs work too.
+        </p>
+
+        <label for="file" class="file-label">
+          <span id="file-label-text">Choose a CSV file&hellip;</span>
+          <input type="file" id="file" name="file" accept=".csv" required />
+        </label>
+
+        <details class="example">
+          <summary>Example CSV</summary>
+<pre>domain
+example.com
+mybrand.io
+acme.co.uk</pre>
+        </details>
+      </section>
+
+      <button type="submit" id="submit-btn" class="primary-btn">Generate XLSX</button>
+      <div id="status" class="status hidden"></div>
+    </form>
+
+    <footer>
+      <p>
+        Built on the <a href="https://developers.entri.com/api-reference#sharing-links-api" target="_blank" rel="noopener">Entri Sharing Links API</a>.
+        Your credentials are processed server-side and not retained.
+      </p>
+    </footer>
+  </main>
+
+  <script>
+    // Default config rendered server-side; used by "Reset to default".
+    const DEFAULT_CONFIG = {{ default_config | tojson }};
+
+    const form = document.getElementById("upload-form");
+    const fileInput = document.getElementById("file");
+    const fileLabelText = document.getElementById("file-label-text");
+    const submitBtn = document.getElementById("submit-btn");
+    const statusEl = document.getElementById("status");
+    const configEl = document.getElementById("config");
+    const jsonStatus = document.getElementById("json-status");
+    const secretInput = document.getElementById("secret");
+    const toggleSecretBtn = document.getElementById("toggle-secret");
+
+    // ---- File picker label ------------------------------------------------
+    fileInput.addEventListener("change", () => {
+      fileLabelText.textContent = fileInput.files.length > 0
+        ? fileInput.files[0].name
+        : "Choose a CSV file…";
+    });
+
+    // ---- Show/hide secret -------------------------------------------------
+    toggleSecretBtn.addEventListener("click", () => {
+      const isPwd = secretInput.type === "password";
+      secretInput.type = isPwd ? "text" : "password";
+      toggleSecretBtn.textContent = isPwd ? "Hide" : "Show";
+    });
+
+    // ---- JSON helpers -----------------------------------------------------
+    function setJsonStatus(msg, kind) {
+      jsonStatus.textContent = msg;
+      jsonStatus.className = "json-status" + (kind ? " json-status--" + kind : "");
+    }
+
+    document.getElementById("format-json").addEventListener("click", () => {
+      try {
+        const parsed = JSON.parse(configEl.value);
+        configEl.value = JSON.stringify(parsed, null, 2);
+        setJsonStatus("JSON formatted ✓", "ok");
+      } catch (e) {
+        setJsonStatus("Invalid JSON: " + e.message, "err");
+      }
+    });
+
+    document.getElementById("reset-config").addEventListener("click", () => {
+      configEl.value = DEFAULT_CONFIG;
+      setJsonStatus("Reset to default", "ok");
+    });
+
+    configEl.addEventListener("blur", () => {
+      try { JSON.parse(configEl.value); setJsonStatus(""); }
+      catch (e) { setJsonStatus("Invalid JSON: " + e.message, "err"); }
+    });
+
+    // ---- Status helper ----------------------------------------------------
+    function setStatus(message, kind) {
+      statusEl.textContent = message;
+      statusEl.className = "status status--" + kind;
+    }
+
+    // ---- Submit -----------------------------------------------------------
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+
+      // Client-side JSON pre-check so we fail fast.
+      try { JSON.parse(configEl.value); }
+      catch (e) {
+        setStatus("Config JSON is invalid: " + e.message, "error");
+        return;
+      }
+
+      const formData = new FormData(form);
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Processing…";
+      setStatus("Generating links — this can take a while for large lists.", "info");
+
+      try {
+        const resp = await fetch("/api/generate", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!resp.ok) {
+          let errMsg = `Request failed (${resp.status})`;
+          try {
+            const errJson = await resp.json();
+            if (errJson && errJson.error) errMsg = errJson.error;
+          } catch (_) { /* not JSON, keep generic message */ }
+          setStatus(errMsg, "error");
+          return;
+        }
+
+        const blob = await resp.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = "entri-sharing-links.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        setStatus("Done! Your XLSX has been downloaded.", "success");
+      } catch (err) {
+        setStatus("Network error: " + err.message, "error");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Generate XLSX";
+      }
+    });
+  </script>
+</body>
+</html>
