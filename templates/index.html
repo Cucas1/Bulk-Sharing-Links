@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Entri Bulk Sharing Links</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
+
 <body>
   <main class="container">
     <header>
@@ -28,28 +30,13 @@
         </p>
 
         <label for="application_id">Application ID</label>
-        <input
-          type="text"
-          id="application_id"
-          name="application_id"
-          value="{{ prefill_app_id }}"
-          placeholder="e.g. abc123def456"
-          required
-          spellcheck="false"
-          autocapitalize="off"
-        />
+        <input type="text" id="application_id" name="application_id" value="{{ prefill_app_id }}"
+          placeholder="e.g. abc123def456" required spellcheck="false" autocapitalize="off" />
 
         <label for="secret">Secret</label>
         <div class="secret-wrapper">
-          <input
-            type="password"
-            id="secret"
-            name="secret"
-            placeholder="Your Entri application secret"
-            required
-            spellcheck="false"
-            autocapitalize="off"
-          />
+          <input type="password" id="secret" name="secret" placeholder="Your Entri application secret" required
+            spellcheck="false" autocapitalize="off" />
           <button type="button" id="toggle-secret" class="link-btn" aria-label="Show or hide secret">Show</button>
         </div>
       </section>
@@ -61,24 +48,20 @@
         <h2><span class="step">2</span> Sharing config</h2>
         <p class="help-text">
           The JSON config object sent to Entri for every domain.
-          The <code>prefilledDomain</code> field is overwritten automatically with each row from your CSV — leave any value there.
-          See the <a href="https://developers.entri.com/api-reference#entrishowentriconfig" target="_blank" rel="noopener">full reference of available fields</a>.
+          The <code>prefilledDomain</code> field is overwritten automatically with each row from your CSV — leave any
+          value there.
+          See the <a href="https://developers.entri.com/api-reference#entrishowentriconfig" target="_blank"
+            rel="noopener">full reference of available fields</a>.
         </p>
 
         <label for="flow">Sharing flow</label>
         <select id="flow" name="flow">
-          <option value="connect" {% if default_flow == 'connect' %}selected{% endif %}>Connect (DNS setup)</option>
-          <option value="sell" {% if default_flow == 'sell' %}selected{% endif %}>Sell (domain purchase)</option>
+          <option value="connect" {% if default_flow=='connect' %}selected{% endif %}>Connect (DNS setup)</option>
+          <option value="sell" {% if default_flow=='sell' %}selected{% endif %}>Sell (domain purchase)</option>
         </select>
 
         <label for="config">Config JSON</label>
-        <textarea
-          id="config"
-          name="config"
-          rows="14"
-          spellcheck="false"
-          required
-        >{{ default_config }}</textarea>
+        <textarea id="config" name="config" rows="14" spellcheck="false" required>{{ default_config }}</textarea>
 
         <div class="row-actions">
           <button type="button" id="format-json" class="link-btn">Format JSON</button>
@@ -98,12 +81,12 @@
 
         <label for="file" class="file-label">
           <span id="file-label-text">Choose a CSV file&hellip;</span>
-          <input type="file" id="file" name="file" accept=".csv" required />
+          <input type="file" id="file" name="file" accept=".csv" />
         </label>
 
         <details class="example">
           <summary>Example CSV</summary>
-<pre>domain
+          <pre>domain
 example.com
 mybrand.io
 acme.co.uk</pre>
@@ -116,7 +99,8 @@ acme.co.uk</pre>
 
     <footer>
       <p>
-        Built on the <a href="https://developers.entri.com/api-reference#sharing-links-api" target="_blank" rel="noopener">Entri Sharing Links API</a>.
+        Built on the <a href="https://developers.entri.com/api-reference#sharing-links-api" target="_blank"
+          rel="noopener">Entri Sharing Links API</a>.
         Your credentials are processed server-side and not retained.
       </p>
     </footer>
@@ -186,6 +170,13 @@ acme.co.uk</pre>
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
 
+      // Show a visible warning if no CSV was selected.
+      if (!fileInput.files.length) {
+        setStatus("Please select a CSV file before generating.", "error");
+        fileInput.focus();
+        return;
+      }
+
       // Client-side JSON pre-check so we fail fast.
       try { JSON.parse(configEl.value); }
       catch (e) {
@@ -219,7 +210,13 @@ acme.co.uk</pre>
         const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = downloadUrl;
-        a.download = "entri-sharing-links.xlsx";
+
+        // Build a filesystem-safe timestamp like 2026-04-30_14-30-22 (local time).
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+          + `_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+        a.download = `entri-sharing-links_${ts}.xlsx`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -235,4 +232,5 @@ acme.co.uk</pre>
     });
   </script>
 </body>
+
 </html>

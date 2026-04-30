@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import uuid
+from datetime import datetime
 
 from flask import Flask, render_template, request, send_file, jsonify
 from werkzeug.utils import secure_filename
@@ -200,7 +201,7 @@ def generate():
     return send_file(
         io.BytesIO(xlsx_bytes),
         as_attachment=True,
-        download_name="entri-sharing-links.xlsx",
+        download_name=f"entri-sharing-links_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx",
         mimetype=(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
